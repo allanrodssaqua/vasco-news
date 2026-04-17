@@ -1,5 +1,6 @@
 "use client";
 
+import Link from 'next/link';
 import React from 'react';
 
 interface NewsCardProps {
@@ -18,10 +19,8 @@ export default function NewsCard({ title, subtitle, date, source_url, source_id 
     : `https://raw.githubusercontent.com/lucasrods/antigravity-assets/main/vasco-placeholder.jpg`; // Placeholder genérico
 
   return (
-    <a 
-      href={source_url} 
-      target="_blank" 
-      rel="noopener noreferrer"
+    <Link 
+      href={`/noticia/${source_id}`} 
       className="news-card-hover group block bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:border-white/20"
     >
       {/* Container da Imagem com Zoom */}
@@ -64,6 +63,6 @@ export default function NewsCard({ title, subtitle, date, source_url, source_id 
           </svg>
         </div>
       </div>
-    </a>
+    </Link>
   );
 }
