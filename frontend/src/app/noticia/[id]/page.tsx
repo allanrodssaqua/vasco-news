@@ -65,6 +65,23 @@ export default async function NoticiaPage({ params }: Props) {
           </p>
         </header>
 
+        {/* Seção de Destaques da Notícia */}
+        {noticia.highlights && noticia.highlights.length > 0 && (
+          <section className="mb-12 p-8 bg-white/[0.03] border-l-4 border-[#c4121a] rounded-r-lg">
+            <h2 className="text-xs uppercase tracking-[0.3em] font-black text-[#c4121a] mb-6">
+              Destaques da Notícia
+            </h2>
+            <ul className="space-y-4">
+              {noticia.highlights.map((highlight, idx) => (
+                <li key={idx} className="flex items-start gap-4 text-white/80 text-lg font-medium">
+                  <span className="text-[#c4121a] mt-1">•</span>
+                  {highlight}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         <section className="prose prose-invert prose-lg max-w-none">
           <div className="text-white/80 leading-loose space-y-8 text-lg md:text-xl font-light px-0 md:px-0">
             {noticia.content.split('\n').map((paragraph, idx) => (
@@ -80,8 +97,7 @@ export default async function NoticiaPage({ params }: Props) {
               <span className="text-[10px] font-bold">AR</span>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-widest font-bold">ALLAN RODS | Curadoria Automática</p>
-              <p className="text-[10px] text-white/30 uppercase">Inteligência Artificial & Jornalismo</p>
+              <p className="text-xs uppercase tracking-widest font-bold">ALLAN RODS | Curadoria de notícias esportivas</p>
             </div>
           </div>
           
