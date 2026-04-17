@@ -28,6 +28,15 @@ export default async function NoticiaPage({ params }: Props) {
     <article className="min-h-screen bg-[#000000] text-white selection:bg-[#c4121a] selection:text-white pb-20">
       {/* Hero Header com Thumbnail */}
       <div className="relative w-full h-[50vh] md:h-[70vh] overflow-hidden">
+        {/* Botão Voltar Mobile-First */}
+        <div className="absolute top-6 left-6 z-20">
+          <Link 
+            href="/" 
+            className="flex items-center gap-2 px-6 py-3 bg-black/50 backdrop-blur-md border border-white/10 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-all duration-300 min-h-[44px]"
+          >
+            ← Voltar para o Início
+          </Link>
+        </div>
         <img 
           src={thumbnailUrl} 
           alt={noticia.title}
@@ -56,7 +65,7 @@ export default async function NoticiaPage({ params }: Props) {
         </header>
 
         <section className="prose prose-invert prose-lg max-w-none">
-          <div className="text-white/80 leading-loose space-y-8 text-lg md:text-xl font-light">
+          <div className="text-white/80 leading-loose space-y-8 text-lg md:text-xl font-light px-0 md:px-0">
             {noticia.content.split('\n').map((paragraph, idx) => (
               <p key={idx}>{paragraph}</p>
             ))}
@@ -67,10 +76,10 @@ export default async function NoticiaPage({ params }: Props) {
         <footer className="mt-20 pt-10 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-4">
             <div className="h-10 w-10 border border-[#c4121a] rounded-full flex items-center justify-center">
-              <span className="text-[10px] font-bold">V</span>
+              <span className="text-[10px] font-bold">AR</span>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-widest font-bold">Redação Vasco News</p>
+              <p className="text-xs uppercase tracking-widest font-bold">ALLAN RODS | Curadoria Automática</p>
               <p className="text-[10px] text-white/30 uppercase">Inteligência Artificial & Jornalismo</p>
             </div>
           </div>

@@ -10,10 +10,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configurações
-CHANNEL_ID = "UCF422qAj_b8ZHtKS6YUaEbg" # @vamovasco
-YOUTUBE_RSS_URL = f"https://www.youtube.com/feeds/videos.xml?channel_id={CHANNEL_ID}"
-# Adicionando fontes RSS extras para garantir dados
+# Canal de Origem (Múltiplos)
+YOUTUBE_CHANNELS = [
+    {"name": "Vamo Vasco", "id": "UCF422qAj_b8ZHtKS6YUaEbg"},
+    {"name": "Machão da Gama", "id": "UCS5R_abGJziuxS0rJymOvSg"}
+]
+# Notícias de portais parceiros
 RSS_SOURCES = [
     "https://ge.globo.com/rss/futebol/times/vasco/",
     "https://www.lance.com.br/rss/vasco"
@@ -23,9 +25,10 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-def get_latest_video_ids():
-    print(f"Buscando vídeos no RSS: {YOUTUBE_RSS_URL}")
-    response = httpx.get(YOUTUBE_RSS_URL)
+def get_latest_video_ids(channel_id):
+    rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+    print(f"Buscando vídeos no RSS: {rss_url}")
+    response = httpx.get(rss_url)
     soup = BeautifulSoup(response.content, "xml")
     video_ids = []
     for entry in soup.find_all("entry")[:3]: # Pega os 3 mais recentes para economizar tokens
@@ -82,10 +85,14 @@ def get_rss_news():
             print(f"Erro no RSS {url}: {e}")
     return news_items
 
-def generate_news_with_gemini(text, source_type="youtube"):
+def generate_news_with_gemini(text, source_type="youtube", channel_name="Vasco TV"):
     if not text:
         return None
     
+    greeting = ""
+    if source_type == "youtube":
+        greeting = f"Fala, vascaíno! Aqui é o Allan Rods trazendo o resumo das últimas novidades postadas pelo canal {channel_name} no YouTube. "
+
     prompt = f"""
     Você é um jornalista esportivo especializado no Vasco da Gama. 
     A partir da transcrição do vídeo abaixo, gere uma matéria jornalística curta e impactante.
@@ -102,8 +109,11 @@ def generate_news_with_gemini(text, source_type="youtube"):
         "team": "Vasco da Gama"
     }}
 
-    Transcrição:
-    {text[:10000]}  # Limitando para não estourar o contexto
+    4. O 'content' DEVE começar obrigatoriamente com o seguinte parágrafo exato:
+    "{greeting}"
+
+    Transcrição/Dados:
+    {text[:10000]}
     """
     
     try:
@@ -125,10 +135,7 @@ def main():
         print("ERRO: GEMINI_API_KEY não encontrada no .env")
         return
 
-    # 1. Processar YouTube
-    video_ids = get_latest_video_ids()
-    
-    # 2. Processar RSS
+    # 1. Processar RSS Externos
     rss_news = get_rss_news()
 
     # Carregar notícias existentes
@@ -143,24 +150,28 @@ def main():
 
     existing_ids = [n.get("source_id") for n in all_news]
 
-    # Processar YouTube
-    for v_id in video_ids:
-        if v_id in existing_ids: continue
+    # 2. Processar Canais do YouTube
+    for channel in YOUTUBE_CHANNELS:
+        print(f"\n--- Processando Canal: {channel['name']} ---")
+        video_ids = get_latest_video_ids(channel['id'])
         
-        print(f"Processando Vídeo: {v_id}")
-        content = get_transcript(v_id)
-        if not content:
-            print("Transcript bloqueado. Usando metadados...")
-            content = get_video_metadata(v_id)
+        for v_id in video_ids:
+            if v_id in existing_ids: continue
             
-        if content:
-            news_data = generate_news_with_gemini(content, "youtube")
-            if news_data:
-                news_data["source_id"] = v_id
-                news_data["source_url"] = f"https://youtube.com/watch?v={v_id}"
-                all_news.insert(0, news_data)
+            print(f"Processando Vídeo: {v_id}")
+            content = get_transcript(v_id)
+            if not content:
+                print("Transcript bloqueado. Usando metadados...")
+                content = get_video_metadata(v_id)
+                
+            if content:
+                news_data = generate_news_with_gemini(content, "youtube", channel['name'])
+                if news_data:
+                    news_data["source_id"] = v_id
+                    news_data["source_url"] = f"https://youtube.com/watch?v={v_id}"
+                    all_news.insert(0, news_data)
 
-    # Processar RSS
+    # 3. Processar RSS Externos
     for item in rss_news:
         source_id = item["link"]
         if source_id in existing_ids: continue
@@ -173,12 +184,25 @@ def main():
             news_data["source_url"] = item["link"]
             all_news.insert(0, news_data)
 
-    # Salvar
-    all_news = all_news[:50]
-    with open(NEWS_FILE, "w", encoding="utf-8") as f:
-        json.dump(all_news, f, ensure_ascii=False, indent=4)
+    # 4. Regra de Retenção (72 horas)
+    from datetime import datetime, timedelta
+    cutoff_date = datetime.now() - timedelta(hours=72)
     
-    print(f"Processamento concluído. Total de notícias: {len(all_news)}")
+    cleaned_news = []
+    for news in all_news:
+        try:
+            news_date = datetime.strptime(news['date'], "%Y-%m-%d %H:%M:%S")
+            if news_date > cutoff_date:
+                cleaned_news.append(news)
+        except:
+            # Se a data estiver em formato inválido, mantemos para segurança ou removemos
+            cleaned_news.append(news)
+
+    # Salvar
+    with open(NEWS_FILE, "w", encoding="utf-8") as f:
+        json.dump(cleaned_news, f, ensure_ascii=False, indent=4)
+    
+    print(f"\nProcessamento concluído. Total de notícias ativas (72h): {len(cleaned_news)}")
 
 if __name__ == "__main__":
     main()

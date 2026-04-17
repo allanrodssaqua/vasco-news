@@ -23,10 +23,13 @@ export default function Home() {
       {/* Footer Simples */}
       <div className="mt-32 pt-12 border-t border-white/5 flex flex-col items-center gap-4 text-center">
         <div className="h-10 w-10 border border-white/10 rounded-full flex items-center justify-center mb-4">
-          <span className="text-[10px] font-bold">CRVG</span>
+          <span className="text-[10px] font-bold">AR</span>
         </div>
         <p className="text-[10px] uppercase tracking-[0.3em] text-white/30 font-bold">
-          © 2026 VascoNews • O Sentimento Não Pode Parar
+          Criado por Allan Rods • O Sentimento Não Pode Parar
+        </p>
+        <p className="text-[9px] uppercase tracking-[0.2em] text-white/10">
+          © 2026 VascoNews • Tecnologia Gemini 3.1
         </p>
       </div>
     </section>
