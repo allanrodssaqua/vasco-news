@@ -20,7 +20,7 @@ RSS_SOURCES = [
     "https://ge.globo.com/rss/futebol/times/vasco/",
     "https://www.lance.com.br/rss/vasco"
 ]
-NEWS_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "news.json")
+NEWS_FILE = os.path.join(os.path.dirname(__file__), "..", "frontend", "src", "data", "news.json")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
