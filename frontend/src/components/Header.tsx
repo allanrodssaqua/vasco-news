@@ -16,7 +16,7 @@ export default function Header() {
           <div className="flex items-center gap-3 mb-1">
             <span className="h-[1.5px] w-8 bg-[#c4121a]" />
             <p className="text-[10px] md:text-[11px] uppercase tracking-[0.6em] text-white/40 font-bold">
-              Curadoria Esportiva
+              CURADORIA ESPORTIVA
             </p>
           </div>
           

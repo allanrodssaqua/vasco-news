@@ -97,7 +97,7 @@ export default async function NoticiaPage({ params }: Props) {
               <span className="text-[10px] font-bold">AR</span>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-widest font-bold">ALLAN RODS | Curadoria de notícias esportivas</p>
+              <p className="text-xs uppercase tracking-widest font-bold">ALLAN RODS | CURADORIA DE NOTÍCIAS ESPORTIVAS</p>
             </div>
           </div>
           

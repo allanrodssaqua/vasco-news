@@ -56,15 +56,44 @@ def get_transcript(video_id):
         return None
 
 def get_video_metadata(video_id):
-    """Fallback para obter título e descrição sem transcrição"""
+    """Fallback para obter título e descrição completa via JSON interno do YouTube"""
     url = f"https://www.youtube.com/watch?v={video_id}"
     try:
-        response = httpx.get(url, follow_redirects=True)
-        soup = BeautifulSoup(response.text, "html.parser")
+        response = httpx.get(url, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+        html = response.text
+        soup = BeautifulSoup(html, "html.parser")
+        
         title = soup.find("title").text.replace(" - YouTube", "")
-        # A descrição é mais difícil de pegar via HTML puro, mas o título já ajuda muito
-        return f"Título do Vídeo: {title}"
-    except:
+        
+        # Tenta encontrar o JSON interno que contém a descrição completa
+        import re
+        description = ""
+        pattern = re.compile(r'var ytInitialData = ({.*?});', re.DOTALL)
+        match = pattern.search(html)
+        if match:
+            try:
+                data = json.loads(match.group(1))
+                # Navega no JSON complexo do YT para achar a descrição
+                # Caminho comum para a descrição em JSON
+                items = data.get("contents", {}).get("twoColumnWatchNextResults", {}).get("results", {}).get("results", {}).get("contents", [])
+                for item in items:
+                    video_renderer = item.get("videoSecondaryInfoRenderer", {})
+                    if video_renderer:
+                        description = video_renderer.get("attributedDescription", {}).get("content", "")
+                        if not description:
+                            # Fallback para formato antigo de descrição
+                            description = video_renderer.get("description", {}).get("runs", [{}])[0].get("text", "")
+            except:
+                pass
+        
+        # Se falhou o JSON, tenta a meta tag tradicional
+        if not description:
+            desc_tag = soup.find("meta", attrs={"name": "description"})
+            description = desc_tag["content"] if desc_tag else ""
+        
+        return f"Título: {title}\nDescrição Completa: {description}"
+    except Exception as e:
+        print(f"Erro ao obter metadados profundos do vídeo {video_id}: {e}")
         return None
 
 def get_rss_news():
@@ -89,33 +118,33 @@ def generate_news_with_gemini(text, source_type="youtube", channel_name="Vasco T
     if not text:
         return None
     
+    print(f"DEBUG: Enviando contexto de {len(text)} caracteres para o Gemini...")
     prompt = f"""
-    Você é Allan Rods, um curador de notícias apaixonado pelo Vasco da Gama e investigador cético.
-    Sua missão é extrair fatos concretos da transcrição/dados fornecidos e criar uma matéria para sua 'Curadoria Esportiva'.
+    Você é Allan Rods, um JORNALISTA ESPORTIVO INVESTIGATIVO especializado no Vasco.
+    Sua missão principal é EXTRAIR NOMES PRÓPRIOS E FATOS CONCRETOS das informações fornecidas.
+
+    REGRAS CRUCIAIS:
+    1. PROIBIDO usar adjetivos genéricos (ex: 'grande reforço', 'peça vital') sem o NOME PRÓPRIO do atleta.
+    2. Se o vídeo fala de um jogador, você DEVE encontrar e citar o nome dele.
+    3. Se o nome não existir na fonte, foque em números, datas ou valores financeiros concretos.
+    4. NÃO ACEITE TEXTOS VAGOS. Se a informação for incerta, use 'bastidores indicam' ou 'especulações sobre [Nome]'.
 
     REGRAS DE PERSONA (Allan Rods):
-    1. PROIBIDO usar saudações fixas ou robotizadas. Varie a abertura em cada notícia.
-    2. Use termos como: 'Saudações Vascaínas', 'Fala, torcida do Gigante', 'Allan Rods na área', 'O sentimento não pode parar', etc.
-    3. O primeiro parágrafo DEVE mencionar obrigatoriamente o canal de origem ({channel_name}) e a sua 'Curadoria Esportiva', mas mude a forma de dizer isso em cada matéria para parecer humano.
-    4. O tom deve ser de um jornalista que ama o clube, mas é rigoroso com os fatos.
-
-    REGRAS JORNALÍSTICAS:
-    1. PROIBIDO vagueza. Identifique quem (nomes próprios), o que (ações exatas) e quando.
-    2. Se houver valores (dinheiro, tempo de contrato, placar), destaque-os.
-    3. Identifique 3 pontos cruciais para a seção de Destaques.
+    1. HUMANIZAÇÃO: Alterne obrigatoriamente entre as seguintes saudações: 'Saudações Vascaínas!', 'Allan Rods na área!', 'Fala, torcida do Gigante!', 'O sentimento não pode parar!'.
+    2. Mencione sempre o canal de origem ({channel_name}) e a sua 'CURADORIA ESPORTIVA' no primeiro parágrafo, mas de forma natural e variada.
 
     FORMATO DE SAÍDA (JSON):
     {{
-        "title": "Título impactante e direto",
-        "subtitle": "Resumo em uma frase",
-        "highlights": ["Ponto crucial 1 com dado concreto", "Ponto crucial 2 com nome próprio", "Ponto crucial 3"],
-        "content": "Texto completo começando com a saudação personalizada e menção à Curadoria/Canal.",
+        "title": "Título com nome do jogador ou fato exato",
+        "subtitle": "Resumo objective",
+        "highlights": ["Fato exato 1", "Fato exato 2", "Fato exato 3"],
+        "content": "Matéria investigativa assinada por Allan Rods.",
         "date": "{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}",
         "team": "Vasco da Gama"
     }}
 
-    Transcrição/Dados:
-    {text[:10000]}
+    CONTEÚDO PARA ANÁLISE (TRANSCRIÇÃO/DADOS):
+    {text[:15000]}
     """
     
     try:
