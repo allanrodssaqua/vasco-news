@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+:root {
+  --background: #000000;
+  --foreground: #ffffff;
+  --vasco-red: #c4121a;
+  --card-bg: #0a0a0a;
+  --card-border: #1a1a1a;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  h1, h2, h3, h4 {
+    font-weight: 700;
+    letter-spacing: -0.025em;
+  }
+}
+
+/* Otimização de animação por GPU */
+.smooth-scale {
+  will-change: transform;
+  transition: transform 0.3s ease-in-out;
+}
+
+.news-card-hover:hover .smooth-scale,
+.news-card-hover:active .smooth-scale {
+  transform: scale(1.05);
+}

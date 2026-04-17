@@ -1,0 +1,15 @@
+# Python
+scripts/venv/
+scripts/.env
+__pycache__/
+*.pyc
+
+# Next.js / Node
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Logs e Misc
+*.log
+.DS_Store
+data/news.json # Opcional: Descomente se não quiser versionar os dados iniciais
