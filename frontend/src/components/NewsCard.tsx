@@ -12,54 +12,60 @@ interface NewsCardProps {
 }
 
 export default function NewsCard({ title, subtitle, date, source_url, source_id }: NewsCardProps) {
-  // Gera thumbnail do YouTube ou placeholder para RSS
   const isYoutube = !source_url.includes('globo.com') && !source_url.includes('lance.com.br');
   const thumbnailUrl = isYoutube 
     ? `https://img.youtube.com/vi/${source_id}/maxresdefault.jpg`
-    : `https://raw.githubusercontent.com/lucasrods/antigravity-assets/main/vasco-placeholder.jpg`; // Placeholder genérico
+    : `https://raw.githubusercontent.com/lucasrods/antigravity-assets/main/vasco-placeholder.jpg`;
+
+  const sourceName = isYoutube ? "VASCO TV / YOUTUBE" : "PORTAL / RSS";
+
+  const formattedDate = new Date(date).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long'
+  }).toUpperCase();
 
   return (
     <Link 
       href={`/noticia/${source_id}`} 
-      className="news-card-hover group block bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:border-white/20"
+      className="news-card-hover group editorial-card flex flex-col h-full rounded-lg"
     >
-      {/* Container da Imagem com Zoom */}
-      <div className="relative h-48 w-full overflow-hidden">
+      {/* Thumbnail */}
+      <div className="relative aspect-video overflow-hidden">
         <img 
           src={thumbnailUrl} 
           alt={title}
-          className="smooth-scale h-full w-full object-cover grayscale-[0.3] group-hover:grayscale-0 transition-all duration-500"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1000&auto=format&fit=crop"; 
-          }}
+          className="card-thumbnail w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+        <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-300" />
       </div>
 
-      {/* Conteúdo */}
-      <div className="p-5 flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <span className="h-1 w-8 bg-[#c4121a]" />
-          <p className="text-[10px] uppercase tracking-[0.2em] text-white/50 font-bold">
-            {new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
-          </p>
+      {/* Content Body */}
+      <div className="p-7 flex flex-col flex-grow">
+        {/* Accent Bar + Date */}
+        <div className="flex flex-col gap-2 mb-4">
+          <div className="h-[2px] w-6 bg-[#c4121a]" />
+          <time className="text-[10px] font-black tracking-widest text-white/40 uppercase">
+            {formattedDate}
+          </time>
         </div>
-        
-        <h2 className="text-xl font-bold leading-tight group-hover:text-[#c4121a] transition-colors duration-300">
+
+        {/* Title */}
+        <h3 className="text-[22px] md:text-2xl font-bold leading-[1.15] tracking-tight mb-4 group-hover:text-white/90 transition-colors">
           {title}
-        </h2>
-        
-        <p className="text-sm text-white/60 line-clamp-2 font-light leading-relaxed">
+        </h3>
+
+        {/* Subtitle / Excerpt */}
+        <p className="text-sm font-light leading-relaxed text-white/40 line-clamp-2 mb-8">
           {subtitle}
         </p>
 
-        <div className="mt-2 pt-4 border-t border-white/5 flex justify-between items-center">
-          <span className="text-[10px] uppercase tracking-widest font-bold text-white/30">
-            {isYoutube ? 'Vasco TV / YouTube' : 'Portal de Notícias'}
+        {/* Card Footer (Static in reference) */}
+        <div className="mt-auto pt-6 border-t border-white/[0.03] flex items-center justify-between">
+          <span className="text-[9px] font-black tracking-[0.2em] text-white/20 uppercase">
+            {sourceName}
           </span>
-          <svg className="w-4 h-4 text-white/20 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="arrow-narrow-right" />
-            <path d="M17 8l4 4m0 0l-4 4m4-4H3" />
+          <svg className="w-4 h-4 text-white/10 group-hover:text-white/40 group-hover:translate-x-1 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
           </svg>
         </div>
       </div>

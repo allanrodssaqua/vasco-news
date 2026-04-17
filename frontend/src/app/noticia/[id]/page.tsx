@@ -1,5 +1,6 @@
 import newsData from '@/data/news.json';
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 
 interface Props {
   params: Promise<{ id: string }>;
