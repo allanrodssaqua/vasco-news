@@ -3,7 +3,7 @@ from fpdf import FPDF
 
 def create_pdf():
     pdf = FPDF(orientation='P', unit='mm', format='A4')
-    pdf.set_title('Vasco News - Estratégia')
+    pdf.set_title('Vasco News - Documentação Técnica')
     pdf.set_author('Allan Rods')
     
     # Add Font (supporting UTF-8)
@@ -35,12 +35,12 @@ def create_pdf():
     pdf.ln(5)
     pdf.set_x(margin)
     pdf.set_font('Arial', 'B', 18)
-    pdf.multi_cell(eff_w, 10, 'Arquitetura Técnica, Estratégia e Monetização', align='C')
+    pdf.multi_cell(eff_w, 10, 'Arquitetura Técnica e Operação', align='C')
     
     pdf.ln(20)
     pdf.set_x(margin)
     pdf.set_font('Arial', '', 14)
-    pdf.multi_cell(eff_w, 10, 'Documento de Planejamento Estratégico', align='C')
+    pdf.multi_cell(eff_w, 10, 'Relatório de Funcionamento do Projeto', align='C')
     
     pdf.set_y(180)
     pdf.set_x(margin)
@@ -60,8 +60,8 @@ def create_pdf():
     pdf.set_font('Arial', '', 12)
     pdf.multi_cell(eff_w, 8, (
         "O Vasco News é um portal de curadoria esportiva automatizada focado no Club de Regatas Vasco da Gama. "
-        "O projeto nasceu com a premissa de 'Custo Zero' de infraestrutura, utilizando o que há de mais moderno em "
-        "automação serverless e inteligência artificial para entregar notícias verificadas e humanizadas em tempo real."
+        "O projeto opera como um pipeline totalmente autônomo, capturando, processando e publicando notícias "
+        "com custo zero de infraestrutura e zero intervenção manual diária."
     ))
     
     pdf.ln(10)
@@ -80,18 +80,18 @@ def create_pdf():
         pdf.ln(6)
 
     add_list_item('Frontend: Next.js 16 & Tailwind CSS v4', 
-                 "Interface estática otimizada para velocidade de carregamento instantâneo e SEO (Core Web Vitals).")
+                 "Interface estática hospedada na Vercel, garantindo performance extrema e SEO de alta qualidade.")
     
-    add_list_item('Inteligência Artificial: Google Gemini 1.5 Flash', 
-                 "Responsável pela 'Curadoria Esportiva', transformando transcrições de vídeos e feeds de notícias em textos jornalísticos com persona própria.")
+    add_list_item('Inteligência Artificial: Google Gemini 3.1 Flash Lite', 
+                 "Utilizado para 'Curadoria Esportiva'. A IA analisa transcrições e metadados de vídeos em busca de fatos e nomes próprios, escrevendo notícias com o tom de voz do jornalista Allan Rods.")
+    
+    add_list_item('Monitoramento: 5 Canais YouTube e feeds RSS', 
+                 "O sistema monitora em tempo real: Vamo Vasco, Machão da Gama, Gigante Vasco, Futbolaço e Mario Coelho, além de portais como GE e Lance.")
     
     add_list_item('Automação: GitHub Actions', 
-                 "Orquestrador que executa o pipeline de coleta a cada 4 horas, garantindo atualização constante sem intervenção humana.")
-    
-    add_list_item('Hospedagem: Vercel', 
-                 "Plataforma global para entrega do conteúdo estático com baixa latência.")
+                 "Executa o pipeline completo a cada 1 hora. Realiza a coleta, gera os dados e atualiza o site automaticamente.")
 
-    # --- PAGE 3: FLUXO E CONEXÕES ---
+    # --- PAGE 3: FLUXO E OPERAÇÃO ---
     pdf.add_page()
     pdf.set_x(margin)
     pdf.set_font('Arial', 'B', 16)
@@ -102,61 +102,12 @@ def create_pdf():
     pdf.set_font('Arial', '', 12)
     pdf.multi_cell(eff_w, 8, (
         "O funcionamento do sistema segue um pipeline linear de 4 etapas:\n\n"
-        "1. Coleta: O sistema se conecta às APIs do YouTube e feeds RSS de canais especializados (ex: Vamo Vasco, Machão da Gama).\n\n"
-        "2. Processamento: As transcrições e textos brutos são enviados para o modelo Gemini 1.5 Flash, que filtra o 'ruído' e extrai apenas informações relevantes.\n\n"
-        "3. Persistência: Os dados processados são salvos em arquivos JSON que servem como o banco de dados estático do portal.\n\n"
-        "4. Disponibilização: O GitHub Actions realiza um commit dos novos dados, o que dispara um rebuild automático no Vercel, publicando as notícias."
+        "1. Coleta: O script consulta os feeds XML dos canais monitorados. Se detecta um vídeo novo (não processado anteriormente), inicia a extração de dados.\n\n"
+        "2. Processamento: O sistema tenta obter a transcrição do vídeo. Caso o YouTube bloqueie a transcrição, o script faz um fallback para os metadados (título e descrição completa). Esses dados são enviados ao Gemini 3.1 Flash Lite.\n\n"
+        "3. Persistência: A IA retorna um JSON estruturado. O script insere essa nova notícia no topo do arquivo 'news.json' e aplica a regra de retenção de 72 horas (removendo notícias antigas).\n\n"
+        "4. Deploy: O GitHub Actions realiza o commit dos novos dados no repositório. Esse push dispara automaticamente o deploy na Vercel, que reconstrói as páginas estáticas em poucos segundos."
     ))
 
-    # --- PAGE 4: PLANO DE MELHORIAS ---
-    pdf.add_page()
-    pdf.set_x(margin)
-    pdf.set_font('Arial', 'B', 16)
-    pdf.multi_cell(eff_w, 10, '4. Plano de Melhorias Técnicas')
-    pdf.ln(5)
-    
-    pdf.set_x(margin)
-    pdf.set_font('Arial', '', 12)
-    pdf.multi_cell(eff_w, 8, (
-        "Para elevar o patamar do projeto profissionalmente, sugerimos as seguintes evoluções:\n\n"
-        "• Notificações Push: Implementação de web-push para alertar o usuário sobre 'Furo de Reportagem' ou notícias urgentes.\n\n"
-        "• Central de Estatísticas: Integração com APIs de futebol para exibir a tabela do campeonato, próximos jogos e artilharia em tempo real.\n\n"
-        "• Busca Semântica: Sistema de busca para que o torcedor possa encontrar notícias passadas de jogadores específicos."
-    ))
-
-    # --- PAGE 5: ESTRATÉGIA DE MARKETING ---
-    pdf.add_page()
-    pdf.set_x(margin)
-    pdf.set_font('Arial', 'B', 16)
-    pdf.multi_cell(eff_w, 10, '5. Estratégia de Marketing e Crescimento')
-    pdf.ln(5)
-    
-    pdf.set_x(margin)
-    pdf.set_font('Arial', '', 12)
-    pdf.multi_cell(eff_w, 8, (
-        "O foco do marketing deve ser a 'Autoridade e Rapidez':\n\n"
-        "• Automação de Redes Sociais: Criar robôs que postam automaticamente no X (Twitter) e threads no Instagram assim que uma notícia é gerada.\n\n"
-        "• SEO Localizado: Otimizar o portal para termos de busca de alta intenção, como 'Escalação do Vasco hoje' ou 'Vasco ao vivo'.\n\n"
-        "• Parcerias com Influenciadores: Engajamento com perfis menores que possuem público fiel, oferecendo o portal como ferramenta de consulta rápida."
-    ))
-
-    # --- PAGE 6: PLANO DE MONETIZAÇÃO ---
-    pdf.add_page()
-    pdf.set_x(margin)
-    pdf.set_font('Arial', 'B', 16)
-    pdf.multi_cell(eff_w, 10, '6. Plano de Monetização')
-    pdf.ln(5)
-    
-    pdf.set_x(margin)
-    pdf.set_font('Arial', '', 12)
-    pdf.multi_cell(eff_w, 8, (
-        "Existem diversas frentes para transformar o tráfego em receita:\n\n"
-        "• Google AdSense: Implementação de banners nativos entre as notícias e no final dos artigos.\n\n"
-        "• Marketing de Afiliados: Inclusão de links para camisas oficiais do Vasco (Amazon/Centauro) e parcerias com casas de apostas com bônus exclusivos para torcedores.\n\n"
-        "• Publiposts Automáticos: Blogs patrocinados gerados pela IA sobre parceiros do clube ou serviços para o torcedor.\n\n"
-        "• Conteúdo Premium/Club: Possibilidade de um 'acesso antecipado' ou sem anúncios para membros apoiadores."
-    ))
-    
     pdf.ln(20)
     pdf.set_x(margin)
     pdf.set_font('Arial', 'B', 14)
@@ -164,9 +115,9 @@ def create_pdf():
     pdf.ln(5)
     pdf.set_x(margin)
     pdf.set_font('Arial', 'I', 12)
-    pdf.multi_cell(eff_w, 8, "O Vasco News está posicionado como uma solução tecnológica de ponta que une baixo custo operacional e alta entrega de valor. Com os ajustes estratégicos de marketing e monetização, o projeto tem potencial de se tornar o principal agregador de notícias da torcida vascaína.")
+    pdf.multi_cell(eff_w, 8, "O Vasco News é uma demonstração de eficiência tecnológica, unindo curadoria humana (via IA especializada) e automação serverless. O sistema garante que a torcida vascaína tenha acesso às notícias dos principais influenciadores do clube em uma única plataforma, de forma rápida e organizada.")
 
-    output_path = 'Vasco_News_Estrategia.pdf'
+    output_path = 'Vasco_News_Documentacao.pdf'
     pdf.output(output_path)
     print(f"PDF gerado com sucesso em: {os.path.abspath(output_path)}")
 

@@ -11,7 +11,7 @@ O sistema opera como um pipeline serverless e estático. A coleta e o processame
 - **Engine:** Python Scripts executados via **GitHub Actions**.
 - **Agendamento:** Cronjob no GitHub Actions (a cada 1 hora).
 - **Extração:** `google-genai` (Geing), `httpx`, `BeautifulSoup` e `youtube-transcript-api`.
-- **IA:** **Google Gemini 1.5 Flash** (Free Tier via Google AI Studio).
+- **IA:** **Google Gemini 3.1 Flash Lite** (via Google AI Studio).
 
 ### Armazenamento e API
 - **Persistência:** Arquivos **JSON/Markdown** ou **SQLite** persistidos no próprio repositório Git.
@@ -49,8 +49,8 @@ Noticias/
     - A cada 1 hora, o workflow `.github/workflows/aggregator.yml` é disparado.
 2.  **Extração (Python Script):**
     - O script busca transcrições no canal `@vamovasco` e feeds RSS.
-3.  **Geração (Gemini 1.5 Flash):**
-    - O texto é enviado para o Gemini 1.5 Flash (API gratuita).
+3.  **Geração (Gemini 3.1 Flash Lite):**
+    - O texto é enviado para o Gemini 3.1 Flash Lite.
     - A IA retorna a notícia formatada em JSON.
 4.  **Commit (Git Persistence):**
     - O GitHub Actions atualiza o arquivo `data/news.json`.
@@ -64,7 +64,3 @@ Noticias/
 - **Performance:** Frontend puramente estático é extremamente rápido para o usuário final.
 - **Simplicidade:** Todo o controle de estado e histórico está no próprio Git.
 
-## 6. Próximos Passos
-1. Criar o script de coleta do YouTube.
-2. Configurar a integração com a API do Google Gemini.
-3. Definir o workflow do GitHub Actions para automação.
