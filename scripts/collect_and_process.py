@@ -15,7 +15,8 @@ YOUTUBE_CHANNELS = [
     {"name": "Vamo Vasco", "id": "UCF422qAj_b8ZHtKS6YUaEbg"},
     {"name": "Machão da Gama", "id": "UCS5R_abGJziuxS0rJymOvSg"},
     {"name": "Gigante Vasco", "id": "UCiwReSvM9QQifgkr6CW_Txw"},
-    {"name": "Futbolaço_vasco", "id": "UCUzrTcQHWjvIF_XYTstdlbw"}
+    {"name": "Futbolaço_vasco", "id": "UCZ90RqFLhuwCtxKnTZbuNJg"},
+    {"name": "Mario Coelho Vasco", "id": "UCUzrTcQHWjvIF_XYTstdlbw"}
 ]
 # Notícias de portais parceiros
 RSS_SOURCES = [
