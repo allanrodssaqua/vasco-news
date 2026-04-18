@@ -13,7 +13,9 @@ load_dotenv()
 # Canal de Origem (Múltiplos)
 YOUTUBE_CHANNELS = [
     {"name": "Vamo Vasco", "id": "UCF422qAj_b8ZHtKS6YUaEbg"},
-    {"name": "Machão da Gama", "id": "UCS5R_abGJziuxS0rJymOvSg"}
+    {"name": "Machão da Gama", "id": "UCS5R_abGJziuxS0rJymOvSg"},
+    {"name": "Gigante Vasco", "id": "UCiwReSvM9QQifgkr6CW_Txw"},
+    {"name": "Futbolaço_vasco", "id": "UCUzrTcQHWjvIF_XYTstdlbw"}
 ]
 # Notícias de portais parceiros
 RSS_SOURCES = [
@@ -182,10 +184,17 @@ def main():
     existing_ids = [n.get("source_id") for n in all_news]
 
     # 2. Processar Canais do YouTube
+    import time
     for channel in YOUTUBE_CHANNELS:
         print(f"\n--- Processando Canal: {channel['name']} ---")
-        video_ids = get_latest_video_ids(channel['id'])
-        
+        try:
+            # Pequeno delay entre canais
+            time.sleep(1)
+            video_ids = get_latest_video_ids(channel['id'])
+        except Exception as e:
+            print(f"Erro ao buscar vídeos do canal {channel['name']}: {e}")
+            continue
+            
         for v_id in video_ids:
             if v_id in existing_ids: continue
             
@@ -196,11 +205,15 @@ def main():
                 content = get_video_metadata(v_id)
                 
             if content:
+                # Delay para evitar limites de cota (RPM)
+                time.sleep(3) # Aumentado para 3s para maior segurança
                 news_data = generate_news_with_gemini(content, "youtube", channel['name'])
                 if news_data:
                     news_data["source_id"] = v_id
                     news_data["source_url"] = f"https://youtube.com/watch?v={v_id}"
                     all_news.insert(0, news_data)
+                    # Persistir IDs recém adicionados para evitar duplicidade no mesmo loop
+                    existing_ids.append(v_id)
 
     # 3. Processar RSS Externos
     for item in rss_news:
@@ -209,11 +222,15 @@ def main():
         
         print(f"Processando RSS: {item['title']}")
         content = f"Título: {item['title']}\nDescrição: {item['description']}"
+        
+        # Delay para evitar limites de cota (RPM)
+        time.sleep(3)
         news_data = generate_news_with_gemini(content, "rss")
         if news_data:
             news_data["source_id"] = source_id
             news_data["source_url"] = item["link"]
             all_news.insert(0, news_data)
+            existing_ids.append(source_id)
 
     # 4. Regra de Retenção (72 horas)
     from datetime import datetime, timedelta

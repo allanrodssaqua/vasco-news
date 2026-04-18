@@ -9,7 +9,7 @@ O sistema opera como um pipeline serverless e estático. A coleta e o processame
 
 ### Processamento e Automação (Serverless)
 - **Engine:** Python Scripts executados via **GitHub Actions**.
-- **Agendamento:** Cronjob no GitHub Actions (a cada 4 horas).
+- **Agendamento:** Cronjob no GitHub Actions (a cada 1 hora).
 - **Extração:** `google-genai` (Geing), `httpx`, `BeautifulSoup` e `youtube-transcript-api`.
 - **IA:** **Google Gemini 1.5 Flash** (Free Tier via Google AI Studio).
 
@@ -46,7 +46,7 @@ Noticias/
 ## 4. Fluxo de Dados (Custo Zero)
 
 1.  **Trigger (GitHub Actions):**
-    - A cada 4 horas, o workflow `.github/workflows/aggregator.yml` é disparado.
+    - A cada 1 hora, o workflow `.github/workflows/aggregator.yml` é disparado.
 2.  **Extração (Python Script):**
     - O script busca transcrições no canal `@vamovasco` e feeds RSS.
 3.  **Geração (Gemini 1.5 Flash):**
