@@ -52,24 +52,29 @@ if GEMINI_API_KEY:
     except Exception as e:
         print(f"Erro ao inicializar cliente Gemini: {e}")
 
+import re
+
 def get_latest_video_ids(channel_id):
-    rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+    """Nova versão: Busca vídeos fazendo scraping da página /videos do canal"""
+    url = f"https://www.youtube.com/channel/{channel_id}/videos"
     try:
-        print(f"Buscando vídeos no RSS: {rss_url}")
-        response = httpx.get(rss_url, headers=HEADERS, timeout=10)
-        if response.status_code != 200:
-            print(f"Erro RSS YouTube ({response.status_code}) para o canal {channel_id}")
+        print(f"Buscando vídeos via Scraping para o canal {channel_id}")
+        response = httpx.get(url, headers=HEADERS, timeout=15, follow_redirects=True)
+        if response.status_code != 200: 
+            print(f"Erro no scraping do YouTube ({response.status_code}) para {channel_id}")
             return []
-            
-        soup = BeautifulSoup(response.content, "xml")
-        video_ids = []
-        for entry in soup.find_all("entry")[:3]: # Pega os 3 mais recentes
-            video_id_tag = entry.find("yt:videoId")
-            if video_id_tag:
-                video_ids.append(video_id_tag.text)
-        return video_ids
+        
+        # Regex para capturar videoId no JSON da página
+        video_ids_found = re.findall(r'"videoId":"([^"]+)"', response.text)
+        # Remove duplicados preservando ordem
+        unique_ids = []
+        for vid in video_ids_found:
+            if vid not in unique_ids:
+                unique_ids.append(vid)
+        
+        return unique_ids[:5]
     except Exception as e:
-        print(f"Erro ao acessar RSS YouTube {channel_id}: {e}")
+        print(f"Erro no scraping do YouTube para {channel_id}: {e}")
         return []
 
 def get_transcript(video_id):
@@ -347,11 +352,20 @@ def main():
     cutoff_date = datetime.now() - timedelta(hours=72)
     
     cleaned_news = []
+    # Limpeza e remoção de IDs quebrados (URLs)
     for news in all_news:
         try:
+            # 1. Remover notícias com more de 72h
             news_date = datetime.strptime(news['date'], "%Y-%m-%d %H:%M:%S")
-            if news_date > cutoff_date:
-                cleaned_news.append(news)
+            if news_date <= cutoff_date:
+                continue
+            
+            # 2. Remover notícias com ID quebrado (URLs que causam 404)
+            if "/" in news.get("source_id", "") and "http" in news.get("source_id", ""):
+                print(f"Removendo notícia com ID inválido: {news['title']}")
+                continue
+                
+            cleaned_news.append(news)
         except:
             # Se a data estiver em formato inválido, mantemos para segurança ou removemos
             cleaned_news.append(news)

@@ -25,7 +25,7 @@ export default async function NoticiaPage({ params }: Props) {
                     !noticia.source_url.includes('espn.com.br');
   const thumbnailUrl = isYoutube 
     ? `https://img.youtube.com/vi/${noticia.source_id}/maxresdefault.jpg`
-    : `https://raw.githubusercontent.com/lucasrods/antigravity-assets/main/vasco-placeholder.jpg`;
+    : `/placeholder.png`;
 
   return (
     <article className="min-h-screen bg-[#000000] text-white selection:bg-[#c4121a] selection:text-white pb-20">
