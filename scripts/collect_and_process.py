@@ -55,27 +55,38 @@ if GEMINI_API_KEY:
 import re
 
 def get_latest_video_ids(channel_id):
-    """Nova versão: Busca vídeos fazendo scraping da página /videos do canal"""
+    """Nova versão: Busca vídeos fazendo scraping da página /videos do canal com retentativas"""
     url = f"https://www.youtube.com/channel/{channel_id}/videos"
-    try:
-        print(f"Buscando vídeos via Scraping para o canal {channel_id}")
-        response = httpx.get(url, headers=HEADERS, timeout=15, follow_redirects=True)
-        if response.status_code != 200: 
-            print(f"Erro no scraping do YouTube ({response.status_code}) para {channel_id}")
-            return []
-        
-        # Regex para capturar videoId no JSON da página
-        video_ids_found = re.findall(r'"videoId":"([^"]+)"', response.text)
-        # Remove duplicados preservando ordem
-        unique_ids = []
-        for vid in video_ids_found:
-            if vid not in unique_ids:
-                unique_ids.append(vid)
-        
-        return unique_ids[:5]
-    except Exception as e:
-        print(f"Erro no scraping do YouTube para {channel_id}: {e}")
-        return []
+    max_retries = 3
+    
+    for attempt in range(max_retries):
+        try:
+            print(f"Buscando vídeos via Scraping para o canal {channel_id} (Tentativa {attempt+1})")
+            response = httpx.get(url, headers=HEADERS, timeout=15, follow_redirects=True)
+            if response.status_code != 200: 
+                print(f"Erro no scraping ({response.status_code}) para {channel_id}. Retentando...")
+                time.sleep(2)
+                continue
+            
+            # Regex para capturar videoId no JSON da página
+            video_ids_found = re.findall(r'"videoId":"([^"]+)"', response.text)
+            if not video_ids_found:
+                print(f"Nenhum vídeo encontrado no HTML para {channel_id}. Retentando...")
+                time.sleep(2)
+                continue
+
+            # Remove duplicados preservando ordem
+            unique_ids = []
+            for vid in video_ids_found:
+                if vid not in unique_ids:
+                    unique_ids.append(vid)
+            
+            return unique_ids[:5]
+        except Exception as e:
+            print(f"Erro na tentativa {attempt+1} para {channel_id}: {e}")
+            time.sleep(2)
+            
+    return []
 
 def get_transcript(video_id):
     try:

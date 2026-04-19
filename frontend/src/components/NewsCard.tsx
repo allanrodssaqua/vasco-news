@@ -12,10 +12,12 @@ interface NewsCardProps {
 }
 
 export default function NewsCard({ title, subtitle, date, source_url, source_id }: NewsCardProps) {
-  const isYoutube = !source_url.includes('globo.com') && !source_url.includes('lance.com.br');
+  const isYoutube = !source_url.includes('globo.com') && 
+                    !source_url.includes('lance.com.br') && 
+                    !source_url.includes('espn.com.br');
   const thumbnailUrl = isYoutube 
     ? `https://img.youtube.com/vi/${source_id}/maxresdefault.jpg`
-    : `https://raw.githubusercontent.com/lucasrods/antigravity-assets/main/vasco-placeholder.jpg`;
+    : `/placeholder.png`;
 
   const sourceName = isYoutube ? "VASCO TV / YOUTUBE" : "PORTAL / RSS";
 
