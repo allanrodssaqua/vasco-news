@@ -20,7 +20,9 @@ export default async function NoticiaPage({ params }: Props) {
     notFound();
   }
 
-  const isYoutube = !noticia.source_url.includes('globo.com') && !noticia.source_url.includes('lance.com.br');
+  const isYoutube = !noticia.source_url.includes('globo.com') && 
+                    !noticia.source_url.includes('lance.com.br') && 
+                    !noticia.source_url.includes('espn.com.br');
   const thumbnailUrl = isYoutube 
     ? `https://img.youtube.com/vi/${noticia.source_id}/maxresdefault.jpg`
     : `https://raw.githubusercontent.com/lucasrods/antigravity-assets/main/vasco-placeholder.jpg`;

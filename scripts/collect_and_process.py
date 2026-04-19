@@ -140,6 +140,13 @@ def get_video_metadata(video_id):
         print(f"Erro ao obter metadados profundos do vídeo {video_id}: {e}")
         return None
 
+import hashlib
+
+def generate_safe_id(url, prefix="portal"):
+    """Gera um ID seguro para URL baseado em um hash da URL original"""
+    hash_object = hashlib.md5(url.encode())
+    return f"{prefix}-{hash_object.hexdigest()[:10]}"
+
 def get_portal_news():
     """Busca notícias fazendo scraping dos portais principais para evitar bloqueios de RSS"""
     news_items = []
@@ -158,9 +165,11 @@ def get_portal_news():
                 for item in items:
                     title_tag = item.select_one("a.feed-post-link")
                     if title_tag and title_tag.get('href'):
+                        url = title_tag['href']
                         news_items.append({
                             "title": title_tag.get_text(strip=True),
-                            "link": title_tag['href'],
+                            "link": url,
+                            "id": generate_safe_id(url, "ge"),
                             "description": "",
                             "source": portal['name']
                         })
@@ -171,12 +180,12 @@ def get_portal_news():
                 for link in links:
                     href = link['href']
                     text = link.get_text(strip=True)
-                    # Filtra links que parecem ser de notícias (com slug no Vasco)
                     if "/vasco/" in href and len(text) > 35:
                         full_url = f"https://www.lance.com.br{href}" if not href.startswith("http") else href
                         news_items.append({
                             "title": text,
                             "link": full_url,
+                            "id": generate_safe_id(full_url, "lance"),
                             "description": "",
                             "source": portal['name']
                         })
@@ -184,7 +193,6 @@ def get_portal_news():
                         if count >= 5: break
             
             elif portal['type'] == "espn":
-                # ESPN usa uma estrutura específica para a lista de notícias
                 items = soup.select("a.contentItem__content")[:5]
                 for item in items:
                     title_tag = item.find(["h1", "h2"])
@@ -193,6 +201,7 @@ def get_portal_news():
                         news_items.append({
                             "title": title_tag.get_text(strip=True),
                             "link": full_url,
+                            "id": generate_safe_id(full_url, "espn"),
                             "description": "",
                             "source": portal['name']
                         })
@@ -318,7 +327,7 @@ def main():
 
     # 3. Processar Notícias de Portais
     for item in portal_news:
-        source_id = item["link"]
+        source_id = item["id"]  # Usa o ID seguro gerado pelo hash
         if source_id in existing_ids: continue
         
         print(f"Processando Portal {item['source']}: {item['title']}")
