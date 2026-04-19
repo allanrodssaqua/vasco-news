@@ -26,7 +26,12 @@ RSS_SOURCES = [
 NEWS_FILE = os.path.join(os.path.dirname(__file__), "..", "frontend", "src", "data", "news.json")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+client = None
+if GEMINI_API_KEY:
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+    except Exception as e:
+        print(f"Erro ao inicializar cliente Gemini: {e}")
 
 def get_latest_video_ids(channel_id):
     rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
@@ -45,7 +50,6 @@ def get_transcript(video_id):
         api = YouTubeTranscriptApi()
         transcript_list = api.list(video_id)
         
-        # Tenta encontrar transcrição em português (manual ou gerada)
         try:
             transcript = transcript_list.find_transcript(['pt'])
         except:
@@ -53,9 +57,18 @@ def get_transcript(video_id):
             
         data = transcript.fetch()
         text = " ".join([i.text for i in data])
+        
+        # Opcional: Validar se a transcrição é curta demais para o esperado
+        if len(text) < 500:
+            print(f"Aviso: Transcrição muito curta ({len(text)} chars). Pode estar incompleta.")
+            
         return text
     except Exception as e:
-        print(f"Erro ao obter transcrição: {e}")
+        error_msg = str(e)
+        if "YouTube is blocking requests from your IP" in error_msg:
+            print(f"ALERTA: YouTube bloqueou o IP para transcrições. Usando apenas metadados (Título/Descrição).")
+        else:
+            print(f"Erro ao obter transcrição: {e}")
         return None
 
 def get_video_metadata(video_id):
@@ -124,49 +137,60 @@ def generate_news_with_gemini(text, source_type="youtube", channel_name="Vasco T
     print(f"DEBUG: Enviando contexto de {len(text)} caracteres para o Gemini...")
     prompt = f"""
     Você é Allan Rods, um JORNALISTA ESPORTIVO INVESTIGATIVO especializado no Vasco.
-    Sua missão principal é EXTRAIR NOMES PRÓPRIOS E FATOS CONCRETOS das informações fornecidas.
+    Sua missão principal é EXTRAIR NOMES PRÓPRIOS E FATOS CONCRETOS das informações fornecidas (Título, Descrição e Transcrição).
 
     REGRAS CRUCIAIS:
     1. PROIBIDO usar adjetivos genéricos (ex: 'grande reforço', 'peça vital') sem o NOME PRÓPRIO do atleta.
-    2. Se o vídeo fala de um jogador, você DEVE encontrar e citar o nome dele.
-    3. Se o nome não existir na fonte, foque em números, datas ou valores financeiros concretos.
-    4. NÃO ACEITE TEXTOS VAGOS. Se a informação for incerta, use 'bastidores indicam' ou 'especulações sobre [Nome]'.
+    2. Encontre e cite NOMES de jogadores, técnicos ou dirigentes mencionados. 
+    3. Se houver discrepância entre o Título e a Transcrição, foque no que é EXPLICADO no conteúdo, mas use o Título e a Descrição como guias fundamentais de contexto.
+    4. Se o conteúdo for longo, faça uma curadoria dos 3 pontos MAIS IMPACTANTES para o torcedor.
+    5. NÃO seja excessivamente cético. Se a fonte cita um nome ou interesse, reporte como 'bastidores' ou 'especulação' em vez de dizer que 'não há informação'.
 
     REGRAS DE PERSONA (Allan Rods):
     1. HUMANIZAÇÃO: Alterne obrigatoriamente entre as seguintes saudações: 'Saudações Vascaínas!', 'Allan Rods na área!', 'Fala, torcida do Gigante!', 'O sentimento não pode parar!'.
-    2. Mencione sempre o canal de origem ({channel_name}) e a sua 'CURADORIA ESPORTIVA' no primeiro parágrafo, mas de forma natural e variada.
+    2. Mencione sempre o canal de origem ({channel_name}) e a sua 'CURADORIA ESPORTIVA' no primeiro parágrafo de forma natural.
 
     FORMATO DE SAÍDA (JSON):
     {{
-        "title": "Título com nome do jogador ou fato exato",
-        "subtitle": "Resumo objective",
-        "highlights": ["Fato exato 1", "Fato exato 2", "Fato exato 3"],
-        "content": "Matéria investigativa assinada por Allan Rods.",
+        "title": "Título impactante com nomes ou fatos",
+        "subtitle": "Resumo objetivo da notícia",
+        "highlights": ["Fato 1", "Fato 2", "Fato 3"],
+        "content": "Matéria investigativa/curadoria assinada por Allan Rods.",
         "date": "{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}",
         "team": "Vasco da Gama"
     }}
 
-    CONTEÚDO PARA ANÁLISE (TRANSCRIÇÃO/DADOS):
-    {text[:15000]}
+    CONTEÚDO PARA ANÁLISE (METADADOS + TRANSCRIÇÃO):
+    {text[:30000]}
     """
     
-    try:
-        print("Enviando para o Gemini 3.1 Flash Lite...")
-        response = client.models.generate_content(
-            model="gemini-3.1-flash-lite-preview",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json"
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            print(f"Enviando para o Gemini 1.5 Flash (Tentativa {attempt + 1})...")
+            response = client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
             )
-        )
-        return json.loads(response.text)
-    except Exception as e:
-        print(f"Erro no Gemini: {e}")
-        return None
+            return json.loads(response.text)
+        except Exception as e:
+            error_str = str(e)
+            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                wait_time = (attempt + 1) * 10
+                print(f"Limite de cota atingido (429). Aguardando {wait_time}s...")
+                import time
+                time.sleep(wait_time)
+            else:
+                print(f"Erro no Gemini: {e}")
+                return None
+    return None
 
 def main():
-    if not GEMINI_API_KEY:
-        print("ERRO: GEMINI_API_KEY não encontrada no .env")
+    if not GEMINI_API_KEY or not client:
+        print("ERRO: GEMINI_API_KEY não configurada corretamente.")
         return
 
     # 1. Processar RSS Externos
@@ -200,20 +224,24 @@ def main():
             if v_id in existing_ids: continue
             
             print(f"Processando Vídeo: {v_id}")
-            content = get_transcript(v_id)
-            if not content:
-                print("Transcript bloqueado. Usando metadados...")
-                content = get_video_metadata(v_id)
+            # Sempre busca metadados (Título/Descrição) para garantir contexto
+            metadata = get_video_metadata(v_id)
+            transcript = get_transcript(v_id)
+            
+            if not transcript:
+                print("Transcrição não disponível. Usando apenas metadados.")
+                content = metadata if metadata else None
+            else:
+                content = f"{metadata}\n\nTRANSCRIÇÃO COMPLETA:\n{transcript}"
                 
             if content:
                 # Delay para evitar limites de cota (RPM)
-                time.sleep(3) # Aumentado para 3s para maior segurança
+                time.sleep(3)
                 news_data = generate_news_with_gemini(content, "youtube", channel['name'])
                 if news_data:
                     news_data["source_id"] = v_id
                     news_data["source_url"] = f"https://youtube.com/watch?v={v_id}"
                     all_news.insert(0, news_data)
-                    # Persistir IDs recém adicionados para evitar duplicidade no mesmo loop
                     existing_ids.append(v_id)
 
     # 3. Processar RSS Externos

@@ -2,7 +2,7 @@ name: Automação Vasco News
 
 on:
   schedule:
-    - cron: '0 * * * *' # Executa a cada 1 hora
+    - cron: '0 */3 * * *' # Executa a cada 3 horas para preservar cota da API
   workflow_dispatch: # Permite execução manual
 
 permissions:
