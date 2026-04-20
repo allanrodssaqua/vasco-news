@@ -1,11 +1,12 @@
 import os
 import json
 import httpx
+import time
 from bs4 import BeautifulSoup
 from youtube_transcript_api import YouTubeTranscriptApi
 from google import genai
 from google.genai import types
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -43,7 +44,9 @@ HEADERS = {
     "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
 }
 NEWS_FILE = os.path.join(os.path.dirname(__file__), "..", "frontend", "src", "data", "news.json")
+COOKIES_FILE = os.path.join(os.path.dirname(__file__), "youtube_cookies.txt")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 client = None
 if GEMINI_API_KEY:
@@ -55,45 +58,66 @@ if GEMINI_API_KEY:
 import re
 
 def get_latest_video_ids(channel_id):
-    """Nova versão: Busca vídeos fazendo scraping da página /videos do canal com retentativas"""
+    """Tenta buscar via API oficial (PlaylistItems) primeiro, fallback para scraping."""
+    if YOUTUBE_API_KEY:
+        try:
+            # Converte Channel ID (UC...) para Uploads Playlist ID (UU...)
+            playlist_id = "UU" + channel_id[2:]
+            url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId={playlist_id}&maxResults=7&key={YOUTUBE_API_KEY}"
+            print(f"Buscando vídeos via API para o canal {channel_id}")
+            response = httpx.get(url, timeout=15)
+            if response.status_code == 200:
+                data = response.json()
+                return [item['snippet']['resourceId']['videoId'] for item in data.get('items', [])]
+            else:
+                print(f"Erro na API YouTube ({response.status_code}). Seguindo para scraping...")
+        except Exception as e:
+            print(f"Falha na API YouTube: {e}. Seguindo para scraping...")
+
+    # Fallback: Scraping
     url = f"https://www.youtube.com/channel/{channel_id}/videos"
     max_retries = 3
-    
     for attempt in range(max_retries):
         try:
             print(f"Buscando vídeos via Scraping para o canal {channel_id} (Tentativa {attempt+1})")
             response = httpx.get(url, headers=HEADERS, timeout=15, follow_redirects=True)
             if response.status_code != 200: 
-                print(f"Erro no scraping ({response.status_code}) para {channel_id}. Retentando...")
                 time.sleep(2)
                 continue
             
-            # Regex para capturar videoId no JSON da página
             video_ids_found = re.findall(r'"videoId":"([^"]+)"', response.text)
             if not video_ids_found:
-                print(f"Nenhum vídeo encontrado no HTML para {channel_id}. Retentando...")
                 time.sleep(2)
                 continue
 
-            # Remove duplicados preservando ordem
             unique_ids = []
             for vid in video_ids_found:
                 if vid not in unique_ids:
                     unique_ids.append(vid)
             
-            return unique_ids[:5]
+            return unique_ids[:7]
         except Exception as e:
-            print(f"Erro na tentativa {attempt+1} para {channel_id}: {e}")
+            print(f"Erro no scraping: {e}")
             time.sleep(2)
             
     return []
 
 def get_transcript(video_id):
+    """Extrai transcrição usando cookies se disponíveis para evitar 429."""
     try:
         print(f"Extraindo transcrição para o vídeo: {video_id}")
-        api = YouTubeTranscriptApi()
-        transcript_list = api.list(video_id)
         
+        # Tenta carregar cookies se o arquivo existir
+        cookies_param = None
+        if os.path.exists(COOKIES_FILE):
+            print(f"Usando cookies de: {COOKIES_FILE}")
+            cookies_param = COOKIES_FILE
+
+        if cookies_param:
+            transcript_list = YouTubeTranscriptApi().list(video_id, cookies=cookies_param)
+        else:
+            transcript_list = YouTubeTranscriptApi().list(video_id)
+            
         try:
             transcript = transcript_list.find_transcript(['pt'])
         except:
@@ -101,83 +125,77 @@ def get_transcript(video_id):
             
         data = transcript.fetch()
         text = " ".join([i.text for i in data])
-        
-        # Opcional: Validar se a transcrição é curta demais para o esperado
-        if len(text) < 500:
-            print(f"Aviso: Transcrição muito curta ({len(text)} chars). Pode estar incompleta.")
-            
         return text
     except Exception as e:
         error_msg = str(e)
         if "YouTube is blocking requests from your IP" in error_msg:
-            print(f"ALERTA: YouTube bloqueou o IP para transcrições. Usando apenas metadados (Título/Descrição).")
+            print(f"ALERTA: YouTube bloqueou o IP para transcrições. Usando apenas metadados.")
         else:
             print(f"Erro ao obter transcrição: {e}")
         return None
 
 def get_video_metadata(video_id):
-    """Fallback para obter título e descrição completa via JSON interno do YouTube"""
+    """Busca metadados via API oficial primeiro, fallback para scraping manual."""
+    if YOUTUBE_API_KEY:
+        try:
+            url = f"https://www.googleapis.com/youtube/v3/videos?part=snippet&id={video_id}&key={YOUTUBE_API_KEY}"
+            response = httpx.get(url, timeout=15)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('items'):
+                    snippet = data['items'][0]['snippet']
+                    return f"Título: {snippet['title']}\nDescrição Completa: {snippet['description']}"
+        except:
+            pass
+
+    # Fallback: Scraping
     url = f"https://www.youtube.com/watch?v={video_id}"
     try:
         response = httpx.get(url, follow_redirects=True, headers=HEADERS, timeout=15)
         html = response.text
         soup = BeautifulSoup(html, "html.parser")
-        
         title = soup.find("title").text.replace(" - YouTube", "")
         
-        # Tenta encontrar o JSON interno que contém a descrição completa
-        import re
         description = ""
         pattern = re.compile(r'var ytInitialData = ({.*?});', re.DOTALL)
         match = pattern.search(html)
         if match:
             try:
                 data = json.loads(match.group(1))
-                # Navega no JSON complexo do YT para achar a descrição
-                # Caminho comum para a descrição em JSON
                 items = data.get("contents", {}).get("twoColumnWatchNextResults", {}).get("results", {}).get("results", {}).get("contents", [])
                 for item in items:
-                    video_renderer = item.get("videoSecondaryInfoRenderer", {})
-                    if video_renderer:
-                        description = video_renderer.get("attributedDescription", {}).get("content", "")
+                    v_renderer = item.get("videoSecondaryInfoRenderer", {})
+                    if v_renderer:
+                        description = v_renderer.get("attributedDescription", {}).get("content", "")
                         if not description:
-                            # Fallback para formato antigo de descrição
-                            description = video_renderer.get("description", {}).get("runs", [{}])[0].get("text", "")
-            except:
-                pass
+                            description = v_renderer.get("description", {}).get("runs", [{}])[0].get("text", "")
+            except: pass
         
-        # Se falhou o JSON, tenta a meta tag tradicional
         if not description:
             desc_tag = soup.find("meta", attrs={"name": "description"})
             description = desc_tag["content"] if desc_tag else ""
         
         return f"Título: {title}\nDescrição Completa: {description}"
     except Exception as e:
-        print(f"Erro ao obter metadados profundos do vídeo {video_id}: {e}")
+        print(f"Erro ao obter metadados: {e}")
         return None
 
-import hashlib
-
 def generate_safe_id(url, prefix="portal"):
-    """Gera um ID seguro para URL baseado em um hash da URL original"""
+    import hashlib
     hash_object = hashlib.md5(url.encode())
     return f"{prefix}-{hash_object.hexdigest()[:10]}"
 
 def get_portal_news():
-    """Busca notícias fazendo scraping dos portais principais para evitar bloqueios de RSS"""
     news_items = []
     for portal in PORTALS:
         try:
             print(f"Scraping Portal: {portal['name']}")
             response = httpx.get(portal['url'], headers=HEADERS, timeout=15, follow_redirects=True)
-            if response.status_code != 200:
-                print(f"Erro ao acessar {portal['name']}: {response.status_code}")
-                continue
-                
+            if response.status_code != 200: continue
             soup = BeautifulSoup(response.text, "html.parser")
             
             if portal['type'] == "ge":
-                items = soup.select(".feed-post")[:5]
+                items = soup.select(".feed-post")[:7]
                 for item in items:
                     title_tag = item.select_one("a.feed-post-link")
                     if title_tag and title_tag.get('href'):
@@ -186,7 +204,6 @@ def get_portal_news():
                             "title": title_tag.get_text(strip=True),
                             "link": url,
                             "id": generate_safe_id(url, "ge"),
-                            "description": "",
                             "source": portal['name']
                         })
             
@@ -202,14 +219,13 @@ def get_portal_news():
                             "title": text,
                             "link": full_url,
                             "id": generate_safe_id(full_url, "lance"),
-                            "description": "",
                             "source": portal['name']
                         })
                         count += 1
-                        if count >= 5: break
+                        if count >= 7: break
             
             elif portal['type'] == "espn":
-                items = soup.select("a.contentItem__content")[:5]
+                items = soup.select("a.contentItem__content")[:7]
                 for item in items:
                     title_tag = item.find(["h1", "h2"])
                     if title_tag and item.get('href'):
@@ -218,7 +234,6 @@ def get_portal_news():
                             "title": title_tag.get_text(strip=True),
                             "link": full_url,
                             "id": generate_safe_id(full_url, "espn"),
-                            "description": "",
                             "source": portal['name']
                         })
                         
@@ -227,112 +242,77 @@ def get_portal_news():
     return news_items
 
 def generate_news_with_gemini(text, source_type="youtube", channel_name="Vasco TV"):
-    if not text:
-        return None
+    if not text or not client: return None
     
-    print(f"DEBUG: Enviando contexto de {len(text)} caracteres para o Gemini...")
+    # Trunca o texto para evitar estourar o limite de contexto da API gratuita
+    truncated_text = text[:30000]
+    print(f"DEBUG: Enviando contexto de {len(truncated_text)} caracteres para o Gemini...")
+    
     prompt = f"""
     Você é Allan Rods, um JORNALISTA ESPORTIVO INVESTIGATIVO especializado no Vasco.
-    Sua missão principal é EXTRAIR NOMES PRÓPRIOS E FATOS CONCRETOS das informações fornecidas (Título, Descrição e Transcrição).
+    Extraia NOMES PRÓPRIOS E FATOS CONCRETOS. PROIBIDO adjetivos genéricos sem nomes.
+    Humanização: 'Saudações Vascaínas!', 'Allan Rods na área!', 'Fala, torcida do Gigante!', 'O sentimento não pode parar!'.
+    Mencione o canal ({channel_name}) e sua 'CURADORIA ESPORTIVA' no início.
 
-    REGRAS CRUCIAIS:
-    1. PROIBIDO usar adjetivos genéricos (ex: 'grande reforço', 'peça vital') sem o NOME PRÓPRIO do atleta.
-    2. Encontre e cite NOMES de jogadores, técnicos ou dirigentes mencionados. 
-    3. Se houver discrepância entre o Título e a Transcrição, foque no que é EXPLICADO no conteúdo, mas use o Título e a Descrição como guias fundamentais de contexto.
-    4. Se o conteúdo for longo, faça uma curadoria dos 3 pontos MAIS IMPACTANTES para o torcedor.
-    5. NÃO seja excessivamente cético. Se a fonte cita um nome ou interesse, reporte como 'bastidores' ou 'especulação' em vez de dizer que 'não há informação'.
-
-    REGRAS DE PERSONA (Allan Rods):
-    1. HUMANIZAÇÃO: Alterne obrigatoriamente entre as seguintes saudações: 'Saudações Vascaínas!', 'Allan Rods na área!', 'Fala, torcida do Gigante!', 'O sentimento não pode parar!'.
-    2. Mencione sempre o canal de origem ({channel_name}) e a sua 'CURADORIA ESPORTIVA' no primeiro parágrafo de forma natural.
-
-    FORMATO DE SAÍDA (JSON):
+    FORMATO JSON (RETORNE APENAS O OBJETO):
     {{
-        "title": "Título impactante com nomes ou fatos",
-        "subtitle": "Resumo objetivo da notícia",
-        "highlights": ["Fato 1", "Fato 2", "Fato 3"],
-        "content": "Matéria investigativa/curadoria assinada por Allan Rods.",
-        "date": "{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}",
-        "team": "Vasco da Gama"
+        "title": "...", "subtitle": "...", "highlights": ["...", "...", "..."],
+        "content": "...", "date": "{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}", "team": "Vasco da Gama"
     }}
-
-    CONTEÚDO PARA ANÁLISE (METADADOS + TRANSCRIÇÃO):
-    {text[:30000]}
+    CONTEÚDO: {truncated_text}
     """
-    
-    max_retries = 3
-    for attempt in range(max_retries):
+    for attempt in range(3):
         try:
-            print(f"Enviando para o Gemini Flash Lite (Tentativa {attempt + 1})...")
             response = client.models.generate_content(
                 model="gemini-flash-lite-latest",
                 contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json"
-                )
+                config=types.GenerateContentConfig(response_mime_type="application/json")
             )
-            return json.loads(response.text)
+            data = json.loads(response.text)
+            # Garante que temos um dicionário (Gemini às vezes retorna lista)
+            if isinstance(data, list) and len(data) > 0:
+                return data[0]
+            return data
         except Exception as e:
-            error_str = str(e)
-            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-                wait_time = (attempt + 1) * 10
-                print(f"Limite de cota atingido (429). Aguardando {wait_time}s...")
-                import time
-                time.sleep(wait_time)
-            else:
+            if "429" in str(e):
+                time.sleep((attempt + 1) * 10)
+            else: 
                 print(f"Erro no Gemini: {e}")
                 return None
     return None
 
 def main():
     if not GEMINI_API_KEY or not client:
-        print("ERRO: GEMINI_API_KEY não configurada corretamente.")
+        print("ERRO: GEMINI_API_KEY não configurada.")
         return
 
-    # 1. Scraping de Portais (GE, Lance, ESPN)
-    portal_news = get_portal_news()
+    # Limpeza de logs grandes (> 5MB)
+    for log in ["debug_output.txt", "run_log.txt"]:
+        log_path = os.path.join(os.path.dirname(__file__), log)
+        if os.path.exists(log_path) and os.path.getsize(log_path) > 5 * 1024 * 1024:
+            print(f"Limpando log grande: {log}")
+            with open(log_path, "w") as f: f.write(f"Log resetado em {datetime.now()}\n")
 
-    # Carregar notícias existentes
+    portal_news = get_portal_news()
+    all_news = []
     if os.path.exists(NEWS_FILE):
         try:
             with open(NEWS_FILE, "r", encoding="utf-8") as f:
                 all_news = json.load(f)
-        except:
-            all_news = []
-    else:
-        all_news = []
+        except: pass
 
     existing_ids = [n.get("source_id") for n in all_news]
 
-    # 2. Processar Canais do YouTube
-    import time
     for channel in YOUTUBE_CHANNELS:
-        print(f"\n--- Processando Canal: {channel['name']} ---")
-        try:
-            # Pequeno delay entre canais
-            time.sleep(1)
-            video_ids = get_latest_video_ids(channel['id'])
-        except Exception as e:
-            print(f"Erro ao buscar vídeos do canal {channel['name']}: {e}")
-            continue
-            
+        print(f"\n--- Canal: {channel['name']} ---")
+        video_ids = get_latest_video_ids(channel['id'])
         for v_id in video_ids:
             if v_id in existing_ids: continue
-            
-            print(f"Processando Vídeo: {v_id}")
-            # Sempre busca metadados (Título/Descrição) para garantir contexto
+            print(f"Vídeo: {v_id}")
             metadata = get_video_metadata(v_id)
             transcript = get_transcript(v_id)
-            
-            if not transcript:
-                print("Transcrição não disponível. Usando apenas metadados.")
-                content = metadata if metadata else None
-            else:
-                content = f"{metadata}\n\nTRANSCRIÇÃO COMPLETA:\n{transcript}"
-                
+            content = f"{metadata}\n\nTRANSCRIÇÃO:\n{transcript}" if transcript else metadata
             if content:
-                # Delay para evitar limites de cota (RPM)
-                # Delay aumentado para 10s para respeitar o limite de 15 RPM
                 time.sleep(10)
                 news_data = generate_news_with_gemini(content, "youtube", channel['name'])
                 if news_data:
@@ -341,51 +321,30 @@ def main():
                     all_news.insert(0, news_data)
                     existing_ids.append(v_id)
 
-    # 3. Processar Notícias de Portais
     for item in portal_news:
-        source_id = item["id"]  # Usa o ID seguro gerado pelo hash
-        if source_id in existing_ids: continue
-        
-        print(f"Processando Portal {item['source']}: {item['title']}")
-        content = f"Fonte: {item['source']}\nTítulo: {item['title']}\nLink: {item['link']}"
-        
-        # Delay de 10s para respeitar a cota do Plano Gratuito
+        if item["id"] in existing_ids: continue
+        print(f"Portal {item['source']}: {item['title']}")
         time.sleep(10)
-        news_data = generate_news_with_gemini(content, "portal", item['source'])
+        news_data = generate_news_with_gemini(f"Fonte: {item['source']}\nTítulo: {item['title']}\nLink: {item['link']}", "portal", item['source'])
         if news_data:
-            news_data["source_id"] = source_id
+            news_data["source_id"] = item["id"]
             news_data["source_url"] = item["link"]
             all_news.insert(0, news_data)
-            existing_ids.append(source_id)
+            existing_ids.append(item["id"])
 
-    # 4. Regra de Retenção (72 horas)
-    from datetime import datetime, timedelta
-    cutoff_date = datetime.now() - timedelta(hours=72)
-    
+    # Retenção (48 horas)
+    cutoff = datetime.now() - timedelta(hours=48)
     cleaned_news = []
-    # Limpeza e remoção de IDs quebrados (URLs)
     for news in all_news:
         try:
-            # 1. Remover notícias com more de 72h
-            news_date = datetime.strptime(news['date'], "%Y-%m-%d %H:%M:%S")
-            if news_date <= cutoff_date:
-                continue
-            
-            # 2. Remover notícias com ID quebrado (URLs que causam 404)
-            if "/" in news.get("source_id", "") and "http" in news.get("source_id", ""):
-                print(f"Removendo notícia com ID inválido: {news['title']}")
-                continue
-                
-            cleaned_news.append(news)
-        except:
-            # Se a data estiver em formato inválido, mantemos para segurança ou removemos
-            cleaned_news.append(news)
+            if datetime.strptime(news['date'], "%Y-%m-%d %H:%M:%S") > cutoff:
+                cleaned_news.append(news)
+        except: cleaned_news.append(news)
 
-    # Salvar
     with open(NEWS_FILE, "w", encoding="utf-8") as f:
         json.dump(cleaned_news, f, ensure_ascii=False, indent=4)
     
-    print(f"\nProcessamento concluído. Total de notícias ativas (72h): {len(cleaned_news)}")
+    print(f"\nConcluído. Notícias ativas (48h): {len(cleaned_news)}")
 
 if __name__ == "__main__":
     main()
