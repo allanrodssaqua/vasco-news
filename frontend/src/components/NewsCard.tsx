@@ -1,7 +1,4 @@
-"use client";
-
-import Link from 'next/link';
-import React from 'react';
+import NewsImage from './NewsImage';
 
 interface NewsCardProps {
   title: string;
@@ -15,9 +12,6 @@ export default function NewsCard({ title, subtitle, date, source_url, source_id 
   const isYoutube = !source_url.includes('globo.com') && 
                     !source_url.includes('lance.com.br') && 
                     !source_url.includes('espn.com.br');
-  const thumbnailUrl = isYoutube 
-    ? `https://img.youtube.com/vi/${source_id}/maxresdefault.jpg`
-    : `/placeholder.png`;
 
   const sourceName = isYoutube ? "VASCO TV / YOUTUBE" : "PORTAL / RSS";
 
@@ -32,14 +26,12 @@ export default function NewsCard({ title, subtitle, date, source_url, source_id 
       className="news-card-hover group editorial-card flex flex-col h-full rounded-lg"
     >
       {/* Thumbnail */}
-      <div className="relative aspect-video overflow-hidden">
-        <img 
-          src={thumbnailUrl} 
-          alt={title}
-          className="card-thumbnail w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-300" />
-      </div>
+      <NewsImage 
+        source_id={source_id}
+        source_url={source_url}
+        title={title}
+        className="aspect-video"
+      />
 
       {/* Content Body */}
       <div className="p-7 flex flex-col flex-grow">

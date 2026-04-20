@@ -1,6 +1,6 @@
 import newsData from '@/data/news.json';
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
+import NewsImage from '@/components/NewsImage';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -20,13 +20,6 @@ export default async function NoticiaPage({ params }: Props) {
     notFound();
   }
 
-  const isYoutube = !noticia.source_url.includes('globo.com') && 
-                    !noticia.source_url.includes('lance.com.br') && 
-                    !noticia.source_url.includes('espn.com.br');
-  const thumbnailUrl = isYoutube 
-    ? `https://img.youtube.com/vi/${noticia.source_id}/maxresdefault.jpg`
-    : `/placeholder.png`;
-
   return (
     <article className="min-h-screen bg-[#000000] text-white selection:bg-[#c4121a] selection:text-white pb-20">
       {/* Hero Header com Thumbnail */}
@@ -40,10 +33,12 @@ export default async function NoticiaPage({ params }: Props) {
             ← Voltar para o Início
           </Link>
         </div>
-        <img 
-          src={thumbnailUrl} 
-          alt={noticia.title}
-          className="w-full h-full object-cover"
+        <NewsImage 
+          source_id={noticia.source_id}
+          source_url={noticia.source_url}
+          title={noticia.title}
+          className="w-full h-full"
+          priority={true}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
       </div>
