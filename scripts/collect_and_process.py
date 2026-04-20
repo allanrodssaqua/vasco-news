@@ -16,8 +16,7 @@ YOUTUBE_CHANNELS = [
     {"name": "Vamo Vasco", "id": "UCF422qAj_b8ZHtKS6YUaEbg"},
     {"name": "Machão da Gama", "id": "UCS5R_abGJziuxS0rJymOvSg"},
     {"name": "Gigante Vasco", "id": "UCiwReSvM9QQifgkr6CW_Txw"},
-    {"name": "Futbolaço_vasco", "id": "UCZ90RqFLhuwCtxKnTZbuNJg"},
-    {"name": "Mario Coelho Vasco", "id": "UCUzrTcQHWjvIF_XYTstdlbw"}
+    {"name": "Futbolaço_vasco", "id": "UCZ90RqFLhuwCtxKnTZbuNJg"}
 ]
 # Configurações de Portais
 PORTALS = [
@@ -250,16 +249,26 @@ def generate_news_with_gemini(text, source_type="youtube", channel_name="Vasco T
     
     prompt = f"""
     Você é Allan Rods, um JORNALISTA ESPORTIVO INVESTIGATIVO especializado no Vasco.
-    Extraia NOMES PRÓPRIOS E FATOS CONCRETOS. PROIBIDO adjetivos genéricos sem nomes.
+    Sua missão é criar uma matéria detalhada baseada nos fatos encontrados (Nomes próprios são ESSENCIAIS).
+    
+    REGRA DE CONTEÚDO (CAMPO 'content'):
+    - O conteúdo deve ser DETALHADO (mínimo de 3 parágrafos longos).
+    - Narre os bastidores, as implicações dos fatos e a repercussão.
+    - Use o estilo Allan Rods: investigativo, direto mas apaixonado pelo Vasco.
+    
     Humanização: 'Saudações Vascaínas!', 'Allan Rods na área!', 'Fala, torcida do Gigante!', 'O sentimento não pode parar!'.
     Mencione o canal ({channel_name}) e sua 'CURADORIA ESPORTIVA' no início.
 
     FORMATO JSON (RETORNE APENAS O OBJETO):
     {{
-        "title": "...", "subtitle": "...", "highlights": ["...", "...", "..."],
-        "content": "...", "date": "{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}", "team": "Vasco da Gama"
+        "title": "Título investigativo e impactante",
+        "subtitle": "Resumo curto do fato principal",
+        "highlights": ["Fato concreto 1 (com nomes)", "Fato concreto 2 (com nomes)", "Fato concreto 3 (com nomes)"],
+        "content": "Matéria completa e detalhada em Allan Rods style. Mínimo de 600 caracteres.",
+        "date": "{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}",
+        "team": "Vasco da Gama"
     }}
-    CONTEÚDO: {truncated_text}
+    CONTEÚDO PARA ANÁLISE: {truncated_text}
     """
     for attempt in range(3):
         try:
@@ -323,7 +332,8 @@ def main():
 
     for item in portal_news:
         if item["id"] in existing_ids: continue
-        print(f"Portal {item['source']}: {item['title']}")
+        print(f"Processando Portal {item['source']}: {item['title']}")
+        # Delay para respeitar cota
         time.sleep(10)
         news_data = generate_news_with_gemini(f"Fonte: {item['source']}\nTítulo: {item['title']}\nLink: {item['link']}", "portal", item['source'])
         if news_data:
@@ -332,8 +342,8 @@ def main():
             all_news.insert(0, news_data)
             existing_ids.append(item["id"])
 
-    # Retenção (48 horas)
-    cutoff = datetime.now() - timedelta(hours=48)
+    # Retenção (72 horas)
+    cutoff = datetime.now() - timedelta(hours=72)
     cleaned_news = []
     for news in all_news:
         try:
@@ -344,7 +354,7 @@ def main():
     with open(NEWS_FILE, "w", encoding="utf-8") as f:
         json.dump(cleaned_news, f, ensure_ascii=False, indent=4)
     
-    print(f"\nConcluído. Notícias ativas (48h): {len(cleaned_news)}")
+    print(f"\nConcluído. Notícias ativas (72h): {len(cleaned_news)}")
 
 if __name__ == "__main__":
     main()
